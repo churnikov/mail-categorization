@@ -1,27 +1,47 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.ensemble import RandomForestClassifier
 from os.path import join, isdir
 from os import listdir
 
 import json
-import pickle 
+import sys
+import pickle
 import re
 
-class Preprocessor(TfidfVectorizer):
-"""
-Preprocesses jsons from specified path. 
-They should have structure:
 
-{
-    "Text" : "Text of mail message",
-    "Title" : "Title of mail",
-    "From" : ["example1@sample1.ru", "woah@haow.by"],
-    "To" : ["example2@sample2.ru", "my@student.ru"],
-    "Categories" : ["Work", "Cooking", "Pickle"]
-}
-"""
-        
-    def print_progress_bar(iteration, total, prefix='', suffix='', decimals=1, length=100, fill='█'):
+def read_json(path):
+    """
+    Gets path+file_name of json file.
+
+    returns dict representation of json
+    """
+    json_dict = None
+    try:
+        with open(path, 'r') as f:
+            s = ''.join([l.strip() for l in f])
+            try:
+                json_dict = json.loads(s)
+            except:
+                raise FileExistsError('Problem with json {}'.format(path))
+    except:
+        raise FileExistsError('Problem with {}'.format(path))
+    return json_dict
+
+
+class Preprocessor(TfidfVectorizer):
+    """
+    Preprocesses jsons from specified path. 
+    They should have structure:
+
+    {
+        "Text" : "Text of mail message",
+        "Title" : "Title of mail",
+        "From" : ["example1@sample1.ru", "woah@haow.by"],
+        "To" : ["example2@sample2.ru", "my@student.ru"],
+        "Categories" : ["Work", "Cooking", "Pickle"]
+    }
+    """
+
+    def print_progress_bar(self, iteration, total, prefix='', suffix='', decimals=1, length=100, fill='█'):
         """
         Call in a loop to create terminal progress bar
         :params:
@@ -42,47 +62,48 @@ They should have structure:
         if iteration == total:
             sys.stdout.write('\n')
 
-
-    def read_json(path):
+    def __read_jsons(self, typ='.json'):
         """
-        Gets path+file_name of json file.
-
-        returns dict representation of json
+        Iterate over files with type in self.directory.
+        :params:
+            typ - Optional: type of files that would be looked up in directory
+                - (Str)
+                - default value: '.json'
+        :returns:
+                - (list)
+                - files in self.directory
+                - if directory doesn'n exist or no files found, raises FileNotFoundError
         """
-        json_dict = None
-        try:
-            with open(path, 'r') as f:
-                s = ''.join([l.strip() for l in f])
-                try:
-                    json_dict = json.loads(s)
-                except:
-                    raise FileExistsError('Problem with json {}'.format(path))
-        except:
-            raise FileExistsError('Problem with {}'.format(path))
-        return json_dict
-
-
-    def __list_files_w_type(self, typ='.json'):
-    """
-    Lists files with type in self.directory.
-    :params:
-        typ - Optional: type of files that would be looked up in directory
-            - (Str)
-            - default value: '.json'
-    :returns:
-            - (list)
-            - files in self.directory
-            - if directory doesn'n exist or no files found, raises FileNotFoundError
-    """
         if isdir(self.directory):
-            return [join(self.directory, f) for f in listdir(self.directory) if f.endswith(typ)]
-        raise FileNotFoundError('Directory {} not found or no files with type {} found'.format(self.directory, typ)) 
+            for f in listdir(self.directory):
+                if f.endswith(typ):
+                    file_name = join(self.directory, f)
+                    yield read_json(file_name)
+        else:
+            raise FileNotFoundError('Directory {} not found'.format(self.directory, typ))
 
+    def build_tfidf_matrix(self):
+        """
+        Fits TfidfVectorizer object, accessible with Preprocessor.vectorizer and returns tfidf matrix.
+        :return:
+            Returns tfidf matrix.
+        """
+        text_id = self.labels['Text']
+        return self.vectorizer.fit_transform(x[text_id] for x in self.__read_jsons())
 
-    def __init__(self, directory='../data/', 
-                labels={"Text": "Text", "Title": "Title", "From" : "From", "To": "To"}, 
-                target={"Target" : "Categories"},
-                **kwargs):
+    def get_target(self):
+        """
+        Gets target variables.
+        :return:
+            list of target variables
+        """
+        target_id = self.labels['Target']
+        return [x[target_id] for x in self.__read_jsons()]
+
+    def __init__(self, directory='../data/',
+                 labels={"Text": "Text", "Title": "Title", "From": "From", "To": "To"},
+                 target={"Target": "Categories"},
+                 **kwargs):
         """
         Initializes child of sklearn's TfidfVectorizer. Takes directory, where jsons are located. 
         :params:
@@ -99,10 +120,10 @@ They should have structure:
                       - default value: {"Target" : "Categories"}.
             kwargs    - dict for values in TfidfVectorizer
                       - (dict)
-        """ 
-        self.vectorizer = super(Preprocessor, self).__init__(**kwargs)
+        """
+        super(Preprocessor, self).__init__(**kwargs)
+        self.vectorizer = TfidfVectorizer(**kwargs)
         self.directory = directory
         self.labels = labels
-        self.target = target     
+        self.target = target
 
-    
