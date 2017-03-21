@@ -4,3 +4,6 @@
 data/test_data
 *.pyc
 configure.py
+data/pickles
+Untitled.ipynb
+src/.ipynb_checkpoints
