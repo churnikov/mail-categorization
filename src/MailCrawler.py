@@ -1,5 +1,6 @@
 import imaplib
 import pyzmail.parse as pyzm
+from utils import print_progress_bar
 
 
 class MailCrawler(object):
@@ -43,7 +44,8 @@ class MailCrawler(object):
         mail_ids = data[0]
         id_list = mail_ids.split()
 
-        for i in id_list:
+        for j, i in enumerate(id_list):
+            print_progress_bar(j, len(id_list))
             result, data = self.mail.uid('fetch', i, '(RFC822)')
             yield pyzm.PyzMessage(pyzm.PyzMessage.smart_parser(data[0][1]))
 
